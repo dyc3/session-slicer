@@ -1,10 +1,11 @@
 //! Stuff for managing recording sessions outputted by teleprompt-studio.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::{Deserialize, Deserializer};
 
+use crate::data::{IntoSession, Take, Track};
 use crate::timestamp::Timestamp;
 
 pub const AUDIO_WAV: &str = "audio.wav";
@@ -12,25 +13,61 @@ pub const TAKES_CSV: &str = "takes.csv";
 pub const META_JSON: &str = "metadata.json";
 
 #[derive(Debug)]
-pub struct Session {
+pub struct TelepromptStudioSession {
     meta: SessionMeta,
     takes: SessionTakes,
+    path: PathBuf,
 }
 
-impl Session {
-    pub fn new(meta: SessionMeta, takes: SessionTakes) -> Self {
-        Self { meta, takes }
-    }
-
+impl TelepromptStudioSession {
     pub fn from_path(path: &Path) -> anyhow::Result<Self> {
         let meta = SessionMeta::from_path(path.join(META_JSON).as_path())?;
         let takes = SessionTakes::from_path(path.join(TAKES_CSV).as_path())?;
 
-        Ok(Self::new(meta, takes))
+        Ok(Self {
+            meta,
+            takes,
+            path: path.to_owned(),
+        })
     }
 
-    pub fn takes(&self) -> &[SessionTake] {
-        self.takes.takes()
+    fn get_session_id(&self) -> String {
+        self.path.file_name().unwrap().to_str().unwrap().to_owned()
+    }
+
+    pub fn takes(&self) -> Vec<Take> {
+        let mut takes = vec![];
+
+        for take in self.takes.takes() {
+            takes.push(Take {
+                session_id: self.get_session_id(),
+                chunk_id: take.chunk_index.to_string(),
+                start: take.start(),
+                end: take.end(),
+            });
+        }
+
+        takes
+    }
+
+    pub fn track(&self) -> Track {
+        Track {
+            file: self.path.join(AUDIO_WAV),
+            sync_offset: self.meta.sync_offset,
+        }
+    }
+}
+
+impl IntoSession for TelepromptStudioSession {
+    fn into_session(self) -> crate::data::Session {
+        crate::data::Session {
+            session_id: self.get_session_id(),
+            tracks: vec![self.track()],
+        }
+    }
+
+    fn takes(&self) -> Vec<Take> {
+        self.takes()
     }
 }
 
