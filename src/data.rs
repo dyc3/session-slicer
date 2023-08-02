@@ -6,6 +6,7 @@ use std::{
 };
 
 use log::*;
+use rayon::prelude::*;
 
 use crate::timestamp::Timestamp;
 
@@ -56,6 +57,7 @@ impl Slicer {
         let results: Vec<_> = self
             .takes_iter()
             .enumerate()
+            .par_bridge()
             .map(|(idx, take)| self.slice_take(idx, take, output_dir))
             .collect();
 
@@ -105,11 +107,15 @@ impl Slicer {
                 .arg(end.to_string())
                 .arg("-c:a")
                 .arg("copy")
-                .arg(out_file)
+                .arg("-threads")
+                .arg("1")
+                .arg(&out_file)
                 .output()?;
 
             if !out.status.success() {
                 error!("ffmpeg failed: {}", String::from_utf8_lossy(&out.stderr));
+            } else {
+                debug!("sliced {:?}", out_file);
             }
         }
 
