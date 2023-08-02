@@ -23,13 +23,8 @@ impl Timestamp {
             + Duration::from_millis(millis))
         .into())
     }
-}
 
-impl Serialize for Timestamp {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
+    pub fn to_string(&self) -> String {
         format!(
             "{:02}:{:02}:{:02}.{:03}",
             self.0.as_secs() / 3600,
@@ -37,7 +32,15 @@ impl Serialize for Timestamp {
             self.0.as_secs() % 60,
             self.0.subsec_millis()
         )
-        .serialize(serializer)
+    }
+}
+
+impl Serialize for Timestamp {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.to_string().serialize(serializer)
     }
 }
 

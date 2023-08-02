@@ -44,6 +44,7 @@ impl TelepromptStudioSession {
                 chunk_id: take.chunk_index.to_string(),
                 start: take.start(),
                 end: take.end(),
+                mark: take.mark().to_owned(),
             });
         }
 

@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
 
     debug!("sessions_dir: {:?}", sessions_dir);
 
-    let mut slicer = Slicer::default();
+    let mut slicer = Slicer::new();
     let sessions = std::fs::read_dir(sessions_dir)?;
     for session in sessions {
         let session = session?;

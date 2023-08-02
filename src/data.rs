@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    process::Command,
     sync::{Arc, RwLock},
 };
 
@@ -16,6 +17,16 @@ pub struct Slicer {
 }
 
 impl Slicer {
+    pub fn new() -> Self {
+        Self {
+            ..Default::default()
+        }
+    }
+
+    pub fn with_ffmpeg(oath: impl AsRef<Path>) -> Self {
+        todo!("impl")
+    }
+
     pub fn register_session(&mut self, session: impl IntoSession) {
         let takes = session.takes();
         let session = session.into_session();
@@ -45,7 +56,7 @@ impl Slicer {
         let results: Vec<_> = self
             .takes_iter()
             .enumerate()
-            .map(|(idx, take)| self.slice_take(idx, take))
+            .map(|(idx, take)| self.slice_take(idx, take, output_dir))
             .collect();
 
         todo!("finish impl");
@@ -53,7 +64,7 @@ impl Slicer {
         Ok(())
     }
 
-    fn slice_take(&self, index: usize, take: &Take) -> anyhow::Result<()> {
+    fn slice_take(&self, index: usize, take: &Take, output_dir: &Path) -> anyhow::Result<()> {
         let sessions = self.sessions.read().unwrap();
         for (track_idx, track) in sessions
             .get(&take.session_id)
@@ -67,16 +78,28 @@ impl Slicer {
             let end = take.end + track.sync_offset;
 
             let file_name = format!(
-                "chunk-{}-take-{}-track-{}.{}",
+                "chunk-{}-take-{}-track-{}-{}.{}",
                 take.chunk_id,
                 index,
                 track_idx,
-                ext.to_str().unwrap()
+                take.mark,
+                ext.to_str().unwrap(),
             );
             debug!("slicing {} to {}", track.file.display(), file_name);
+
+            Command::new("ffmpeg")
+                .arg("-i")
+                .arg(track.file.as_os_str())
+                .arg("-ss")
+                .arg(start.to_string())
+                .arg("-to")
+                .arg(end.to_string())
+                .arg("-c:a")
+                .arg("copy")
+                .arg(output_dir.join(file_name))
+                .output()?;
         }
 
-        todo!("impl");
         Ok(())
     }
 }
@@ -99,6 +122,7 @@ pub struct Take {
     pub chunk_id: String,
     pub start: Timestamp,
     pub end: Timestamp,
+    pub mark: String,
 }
 
 pub trait IntoSession {
