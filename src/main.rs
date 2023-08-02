@@ -107,5 +107,6 @@ fn main() -> anyhow::Result<()> {
 
     slicer.perform_slicing(output_dir)?;
 
+    info!("Done!");
     Ok(())
 }

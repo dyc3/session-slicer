@@ -98,6 +98,12 @@ impl Slicer {
                 continue;
             }
 
+            let args = if ext == "mp4" {
+                ffmpeg_args_transcode()
+            } else {
+                ffmpeg_args_remux()
+            };
+
             let out = Command::new("ffmpeg")
                 .arg("-i")
                 .arg(track.file.as_os_str())
@@ -105,10 +111,9 @@ impl Slicer {
                 .arg(start.to_string())
                 .arg("-to")
                 .arg(end.to_string())
-                .arg("-c:a")
-                .arg("copy")
                 .arg("-threads")
                 .arg("1")
+                .args(args)
                 .arg(&out_file)
                 .output()?;
 
@@ -121,6 +126,14 @@ impl Slicer {
 
         Ok(())
     }
+}
+
+const fn ffmpeg_args_remux() -> &'static [&'static str] {
+    &["-c", "copy"]
+}
+
+const fn ffmpeg_args_transcode() -> &'static [&'static str] {
+    &["-c:a", "copy"]
 }
 
 #[derive(Debug)]
