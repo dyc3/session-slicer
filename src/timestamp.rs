@@ -64,6 +64,14 @@ impl From<Timestamp> for Duration {
     }
 }
 
+impl Add for Timestamp {
+    type Output = Timestamp;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        (self.0 + rhs.0).into()
+    }
+}
+
 impl Add<Duration> for Timestamp {
     type Output = Timestamp;
 

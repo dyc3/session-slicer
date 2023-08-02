@@ -1,13 +1,9 @@
-use std::{io::stdin, time::Duration};
-
 use clap::Parser;
 use log::*;
-use signalo::filters::dimensioned::dimensions::Time;
 
 use crate::{
     data::Slicer,
     synchronizer::{SyncerCache, TrackSync},
-    timestamp::Timestamp,
 };
 
 mod cli;
@@ -43,7 +39,7 @@ fn main() -> anyhow::Result<()> {
     }
     info!(
         "found {} sessions, {} takes",
-        slicer.sessions.len(),
+        slicer.sessions.read().unwrap().len(),
         slicer.takes.values().map(|v| v.len()).sum::<usize>()
     );
 
@@ -61,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    for session in slicer.sessions.iter_mut() {
+    for session in slicer.sessions.write().unwrap().values_mut() {
         let session_id = session.session_id.clone();
         let video_path = video_dir.join(format!("video-session-{}.mp4", &session_id));
         if video_path.exists() {
@@ -104,6 +100,12 @@ fn main() -> anyhow::Result<()> {
     if should_save_syncer {
         syncer_cache.save(&syncer_cache_path)?;
     }
+
+    let output_dir = args
+        .output
+        .unwrap_or_else(|| args.project.clone().unwrap().join("video/slicer_output/"));
+
+    slicer.perform_slicing(output_dir)?;
 
     Ok(())
 }
