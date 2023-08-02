@@ -59,7 +59,11 @@ impl Slicer {
             .map(|(idx, take)| self.slice_take(idx, take, output_dir))
             .collect();
 
-        todo!("finish impl");
+        for result in results {
+            if let Err(e) = result {
+                error!("failed to slice: {}", e);
+            }
+        }
 
         Ok(())
     }
@@ -86,8 +90,13 @@ impl Slicer {
                 ext.to_str().unwrap(),
             );
             debug!("slicing {} to {}", track.file.display(), file_name);
+            let out_file = output_dir.join(file_name);
+            if out_file.exists() {
+                warn!("file already exists, skipping");
+                continue;
+            }
 
-            Command::new("ffmpeg")
+            let out = Command::new("ffmpeg")
                 .arg("-i")
                 .arg(track.file.as_os_str())
                 .arg("-ss")
@@ -96,8 +105,12 @@ impl Slicer {
                 .arg(end.to_string())
                 .arg("-c:a")
                 .arg("copy")
-                .arg(output_dir.join(file_name))
+                .arg(out_file)
                 .output()?;
+
+            if !out.status.success() {
+                error!("ffmpeg failed: {}", String::from_utf8_lossy(&out.stderr));
+            }
         }
 
         Ok(())
