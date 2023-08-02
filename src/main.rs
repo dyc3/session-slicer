@@ -1,14 +1,17 @@
-use std::time::Duration;
+use std::{io::stdin, time::Duration};
 
 use clap::Parser;
 use log::*;
+use signalo::filters::dimensioned::dimensions::Time;
 
-use crate::data::Slicer;
+use crate::{data::Slicer, synchronizer::TrackSync, timestamp::Timestamp};
 
 mod cli;
 mod data;
 mod session;
+mod synchronizer;
 pub mod timestamp;
+mod tui;
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
@@ -50,9 +53,13 @@ fn main() -> anyhow::Result<()> {
         let video_path = video_dir.join(format!("video-session-{}.mp4", &session_id));
         if video_path.exists() {
             info!("found video for session {}", session_id);
+            // let syncer = synchronizer::FileTrackSyncer::new();
+            let syncer = synchronizer::AskUserSyncer::new();
+            let sync_offset = syncer.find_sync_offset(&video_path)?;
+
             session.tracks.push(data::Track {
                 file: video_path,
-                sync_offset: Duration::ZERO.into(),
+                sync_offset,
             });
         } else {
             warn!("no video found for session {}", session_id);
