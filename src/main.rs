@@ -4,7 +4,11 @@ use clap::Parser;
 use log::*;
 use signalo::filters::dimensioned::dimensions::Time;
 
-use crate::{data::Slicer, synchronizer::TrackSync, timestamp::Timestamp};
+use crate::{
+    data::Slicer,
+    synchronizer::{SyncerCache, TrackSync},
+    timestamp::Timestamp,
+};
 
 mod cli;
 mod data;
@@ -48,14 +52,45 @@ fn main() -> anyhow::Result<()> {
         .video
         .unwrap_or_else(|| args.project.clone().unwrap().join("video"));
 
+    let syncer_cache_path = video_dir.join("syncer_cache.json");
+    let (mut syncer_cache, mut should_save_syncer) = match SyncerCache::load(&syncer_cache_path) {
+        Ok(cache) => (cache, false),
+        Err(e) => {
+            warn!("failed to load syncer cache: {}", e);
+            (SyncerCache::default(), true)
+        }
+    };
+
     for session in slicer.sessions.iter_mut() {
         let session_id = session.session_id.clone();
         let video_path = video_dir.join(format!("video-session-{}.mp4", &session_id));
         if video_path.exists() {
             info!("found video for session {}", session_id);
             // let syncer = synchronizer::FileTrackSyncer::new();
-            let syncer = synchronizer::AskUserSyncer::new();
-            let sync_offset = syncer.find_sync_offset(&video_path)?;
+
+            let file_name = video_path.file_name().unwrap().to_str().unwrap();
+
+            let sync_offset = match syncer_cache.get(file_name) {
+                Some(timestamp) => {
+                    info!(
+                        "using cached sync offset for {}: {:?}",
+                        file_name, timestamp
+                    );
+                    session.tracks.push(data::Track {
+                        file: video_path,
+                        sync_offset: timestamp,
+                    });
+                    continue;
+                }
+                None => {
+                    let syncer = synchronizer::AskUserSyncer::new();
+                    let timestamp = syncer.find_sync_offset(&video_path)?;
+
+                    syncer_cache.set(file_name, timestamp);
+                    should_save_syncer = true;
+                    timestamp
+                }
+            };
 
             session.tracks.push(data::Track {
                 file: video_path,
@@ -64,6 +99,10 @@ fn main() -> anyhow::Result<()> {
         } else {
             warn!("no video found for session {}", session_id);
         }
+    }
+
+    if should_save_syncer {
+        syncer_cache.save(&syncer_cache_path)?;
     }
 
     Ok(())

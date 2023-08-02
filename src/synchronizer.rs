@@ -1,9 +1,11 @@
 use std::{
+    collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
     time::Duration,
 };
 
+use serde::{Deserialize, Serialize};
 use symphonia::core::{
     codecs::{DecoderOptions, CODEC_TYPE_NULL},
     formats::FormatOptions,
@@ -124,5 +126,40 @@ impl TrackSync for AskUserSyncer {
 
             return Ok(sync_offset);
         }
+    }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct SyncerCache {
+    entries: HashMap<String, Timestamp>,
+    #[serde(skip)]
+    dirty: bool,
+}
+
+impl SyncerCache {
+    pub fn load(path: impl AsRef<Path>) -> anyhow::Result<Self> {
+        let path = path.as_ref();
+        let file = File::open(path)?;
+        let cache = serde_json::from_reader(file)?;
+        Ok(cache)
+    }
+
+    pub fn save(&self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let path = path.as_ref();
+        let file = File::create(path)?;
+        serde_json::to_writer_pretty(file, self)?;
+        Ok(())
+    }
+
+    pub fn get(&self, file_name: impl AsRef<str>) -> Option<Timestamp> {
+        let mut file_name = file_name.as_ref();
+
+        self.entries.get(file_name).copied()
+    }
+
+    pub fn set(&mut self, file_name: impl AsRef<str>, timestamp: Timestamp) {
+        let file_name = file_name.as_ref();
+        self.entries.insert(file_name.to_owned(), timestamp);
+        self.dirty = true;
     }
 }

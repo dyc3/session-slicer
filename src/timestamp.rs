@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Context;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Timestamp(Duration);
@@ -22,6 +22,22 @@ impl Timestamp {
         Ok((Duration::from_secs(hours * 3600 + minutes * 60 + seconds)
             + Duration::from_millis(millis))
         .into())
+    }
+}
+
+impl Serialize for Timestamp {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        format!(
+            "{:02}:{:02}:{:02}.{:03}",
+            self.0.as_secs() / 3600,
+            self.0.as_secs() / 60,
+            self.0.as_secs() % 60,
+            self.0.subsec_millis()
+        )
+        .serialize(serializer)
     }
 }
 
